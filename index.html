@@ -244,7 +244,7 @@ var PLAN=25;
 /* Servidor (Supabase): login dos profissionais e dados de cada negócio.
    A chave abaixo é a chave pública do projeto; quem protege os dados são as regras do banco (schema.sql).
    Com url e key vazios o app roda em modo demonstração, só neste navegador. */
-var SB={url:'',key:'',google:false,recovery:false};
+var SB={url:'https://kvfhutldwrlegyktawje.supabase.co',key:'sb_publishable_GDPSe7q3jOpG7ngPrTDQBw_RGUFGcVW',google:false,recovery:false};
 var CLOUD=!!(SB.url&&SB.key), sb=null;
 var A={ready:false,offline:false,session:null,profile:null,own:{},shopsLoaded:false,accounts:null,view:'welcome',err:'',msg:'',busy:false,justIn:false};
 var PUB={}, DBB={}, REV={}, DATA={};
@@ -746,6 +746,7 @@ function authMsg(e){
   if(/rate limit|too many/i.test(m)||c==='over_request_rate_limit'||c==='over_email_send_rate_limit') return 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente de novo.';
   if(/signups? (are )?(not allowed|disabled)/i.test(m)) return 'O cadastro de novas contas está fechado no momento.';
   if(/provider is not enabled/i.test(m)) return 'Essa forma de entrar ainda não está ativa.';
+  if(/sending (confirmation|recovery)|not authorized|smtp/i.test(m)||c==='email_address_not_authorized'||c==='unexpected_failure') return 'O envio de e-mails ainda não está ativo, então este passo não pôde ser concluído. Tente de novo mais tarde.';
   if(/failed to fetch|network/i.test(m)) return 'Sem conexão com o servidor. Confira a internet e tente de novo.';
   return 'Não foi possível concluir. Tente de novo.';
 }
