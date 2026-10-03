@@ -6,7 +6,13 @@
 <title>Encaixe · agenda online para barbearias</title>
 <meta name="description" content="Agenda online para barbearias: o cliente marca o horário sozinho, com aviso pelo WhatsApp e evento no Google Agenda.">
 <meta name="theme-color" content="#0a0a0a">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0a'/%3E%3Ctext x='29' y='45' font-family='Arial,sans-serif' font-weight='700' font-size='40' text-anchor='middle' fill='%23fbfaf7'%3Ee%3C/text%3E%3Ccircle cx='48' cy='42' r='5' fill='%23d4af37'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Agenday">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Figtree:wght@400;500;600;700&display=swap">
@@ -68,6 +74,7 @@ h3{font-size:1rem;font-weight:600}
 .btn.quiet{background:transparent}
 .btn.danger{color:var(--bad)}
 .btn.block{width:100%}
+.btn:disabled{opacity:.6;cursor:progress}
 .btn.sm{min-height:38px;padding:6px 14px;font-size:.875rem}
 .linkbtn{align-self:flex-start;background:none;border:0;padding:0;color:var(--brand);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 
@@ -161,7 +168,7 @@ section[id^="st-"]{scroll-margin-top:76px}
 .savebar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--glass);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
 .savebar-in{max-width:640px;margin-inline:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .savebar-in .grow{flex:1;min-width:120px;font-weight:600}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:9;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-weight:600;font-size:.9rem;max-width:calc(100% - 32px);text-align:center}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:9;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:22px;font-weight:600;font-size:.9rem;max-width:calc(100% - 32px);text-align:center}
 </style>
 </head>
 <body>
@@ -170,6 +177,7 @@ section[id^="st-"]{scroll-margin-top:76px}
     <button class="brandname" data-act="home" id="brand-home">Encaixe</button>
     <span class="tag">protótipo</span>
     <span class="spacer"></span>
+    <button class="btn sm" id="install-btn" data-act="install" hidden>Instalar app</button>
   </div>
   <div class="pole" aria-hidden="true"></div>
 </header>
@@ -180,12 +188,12 @@ section[id^="st-"]{scroll-margin-top:76px}
 (function(){
 'use strict';
 var $app=document.getElementById('app'), $toast=document.getElementById('toast');
-var LS='cadeira-livre.v1', ME='encaixe.me';
+var LS='cadeira-livre.v1', ME='encaixe.me', LAST='encaixe.last';
 var PLAN=25;
 var REMINDER='Olá, {cliente}! Lembrete do seu horário na {barbearia}: {servico}, {data} às {hora}. Posso confirmar?';
 /* Barbearias fixas: aparecem para todo mundo que abre o link, mesmo sem banco de dados.
    Ao mudar algum dado daqui, aumente o "rev" para os navegadores que já abriram o app receberem a versão nova. */
-var BUILTIN=[{rev:3,slug:'barba-na-porta',name:'Barba na Porta',whats:'21993616658',address:'',
+var BUILTIN=[{rev:4,slug:'barba-na-porta',name:'Barba na Porta',whats:'21993616658',api:'',address:'',
   bio:'A experiência da barbearia na sua casa. Barbeiro a domicílio na Barra da Tijuca e no Recreio, com o deslocamento já incluso no valor.',
   step:30,leadDays:1,places:{shop:false,home:true},homeFee:0,homeMin:0,
   hours:[{open:false,start:'08:00',end:'17:00'},{open:true,start:'08:00',end:'17:00'},{open:true,start:'08:00',end:'17:00'},{open:true,start:'08:00',end:'17:00'},
@@ -213,7 +221,7 @@ var MOL=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto',
 
 var S={mode:'loading',shops:{},bookings:{},clients:{},got:{shops:false,bookings:false,clients:false}};
 var db=null;
-var ui={route:{name:'home'},extras:{},svc:null,date:null,slot:null,place:null,cname:'',cphone:'',caddr:'',err:'',done:null,
+var ui={route:{name:'home'},sending:false,extras:{},svc:null,date:null,slot:null,place:null,cname:'',cphone:'',caddr:'',err:'',done:null,
         tab:'agenda',pdate:null,draft:null,draftOf:null,base:'',perr:'',confirmDel:false,
         newName:'',newWhats:'',newErr:'',pmonth:null,cq:'',cid:null,cdraft:null,cerr:'',cdel:false,
         rstar:0,rtext:'',pbirth:'',pcpf:'',paddr:'',pfSaved:false,pfErr:''};
@@ -303,7 +311,7 @@ function norm(s){
   s.places=s.places&&typeof s.places==='object'?{shop:s.places.shop!==false,home:!!s.places.home}:{shop:true,home:false};
   s.homeFee=Number(s.homeFee)||0; s.homeMin=Number(s.homeMin)||0;
   s.reviews={on:s.reviews?s.reviews.on!==false:true,google:(s.reviews&&s.reviews.google)||''};
-  ['name','whats','address','bio'].forEach(function(k){s[k]=s[k]||''});
+  ['name','whats','address','bio','api'].forEach(function(k){s[k]=s[k]||''});
   return s;
 }
 function defaultHours(){
@@ -324,6 +332,9 @@ function builtinShops(){
 function pickedExtras(shop){return shop.extras.filter(function(e){return ui.extras[e.id]})}
 function sumOf(list,k){return list.reduce(function(a,e){return a+(Number(e[k])||0)},0)}
 function priceTxt(v){return Number(v)>0?brl(v):'valor a confirmar'}
+function isStandalone(){
+  try{return !!(navigator.standalone||matchMedia('(display-mode: standalone)').matches)}catch(e){return false}
+}
 function routeOf(h){
   try{h=decodeURIComponent(String(h||'').replace(/^#/,''))}catch(e){return null}
   if(!h) return null;
@@ -333,6 +344,7 @@ function syncHash(r){
   if(r.manual||r.name==='rate') return;
   var h=r.name==='home'?'':'#'+r.slug+(r.name==='panel'?'/painel':'');
   try{ if((location.hash||'')!==h) history.replaceState(null,'',h||location.pathname+location.search) }catch(e){}
+  try{localStorage.setItem(LAST,h)}catch(e){}
 }
 function exampleData(){
   var shop=newShop('Barbearia Exemplo','','barbearia-exemplo');
@@ -371,6 +383,22 @@ function upsertClient(shop,name,phone,addr){
   c={id:rid('c'),shop:shop.slug,name:name,phone:phone||'',birth:'',cpf:'',address:addr||'',notes:'',createdAt:new Date().toISOString()};
   putClient(c,true); return c.id;
 }
+/* Agenda remota: quando a barbearia tem "api", os horários ocupados vêm do Google Agenda dela
+   e o agendamento do cliente é gravado lá. Se a agenda não responder, o app volta ao pedido por WhatsApp. */
+var REMOTE={};
+function apiOf(shop){return okUrl(shop&&shop.api)}
+function remoteOk(shop){var r=REMOTE[shop.slug];return !!(apiOf(shop)&&r&&r.state==='ok')}
+function loadBusy(shop,force){
+  var api=apiOf(shop); if(!api) return;
+  var r=REMOTE[shop.slug];
+  if(r&&!force&&(r.state==='loading'||Date.now()-r.at<60000)) return;
+  REMOTE[shop.slug]={state:'loading',list:r?r.list:[],at:Date.now(),first:!r};
+  var from=today(), to=addDays(from,15+shop.leadDays);
+  fetch(api+'?action=busy&from='+from+'&to='+to).then(function(x){return x.json()}).then(function(j){
+    if(!j||!j.ok||!Array.isArray(j.busy)) throw new Error('resposta inesperada da agenda');
+    REMOTE[shop.slug]={state:'ok',list:j.busy,at:Date.now()}; render();
+  }).catch(function(e){console.error(e); REMOTE[shop.slug]={state:'fail',list:[],at:Date.now()}; render()});
+}
 function slotsFor(shop,date,dur){
   var h=shop.hours[parseDate(date).getDay()];
   if(!h||!h.open) return [];
@@ -378,12 +406,14 @@ function slotsFor(shop,date,dur){
   if(!(s<e)||!(dur>0)) return [];
   var br=shop.pause&&shop.pause.on?[toMin(shop.pause.start),toMin(shop.pause.end)]:null;
   var busy=bookingsOf(shop.slug).filter(function(b){return b.date===date&&b.status!=='cancelado'});
+  var rem=REMOTE[shop.slug], rb=rem&&rem.list?rem.list.filter(function(x){return x.date===date}):[];
   var now=new Date(), minNow=date===today()?now.getHours()*60+now.getMinutes():-1, out=[];
   if(date<today()) return [];
   for(var t=s;t+dur<=e;t+=step){
     if(t<=minNow) continue;
     if(br&&t<br[1]&&t+dur>br[0]) continue;
     if(busy.some(function(b){return t<b.start+b.dur&&t+dur>b.start})) continue;
+    if(rb.some(function(x){return t<x.end&&t+dur>x.start})) continue;
     out.push(t);
   }
   return out;
@@ -439,6 +469,7 @@ function startLocal(){
 }
 function init(){
   var r0=routeOf(location.hash);
+  if(!r0&&isStandalone()){try{r0=routeOf(localStorage.getItem(LAST)||'')}catch(e){}}
   if(r0) go(r0); else render();
   var p=null;
   try{ if(window.claude&&typeof window.claude.use==='function') p=window.claude.use('db') }catch(e){}
@@ -465,7 +496,7 @@ function init(){
 
 /* ---------- telas ---------- */
 function go(route){
-  ui.route=route; ui.extras={}; ui.svc=null; ui.date=null; ui.slot=null; ui.place=null; ui.err=''; ui.done=null; ui.perr=''; ui.confirmDel=false;
+  ui.route=route; ui.sending=false; ui.extras={}; ui.svc=null; ui.date=null; ui.slot=null; ui.place=null; ui.err=''; ui.done=null; ui.perr=''; ui.confirmDel=false;
   ui.cid=null; ui.cdraft=null; ui.cerr=''; ui.cdel=false; ui.rstar=0; ui.rtext=''; ui.pfSaved=false; ui.pfErr='';
   if(route.name==='shop'){
     if(route.manual){ if(!route.keep){ui.cname='';ui.cphone='';ui.caddr=''} }
@@ -524,6 +555,8 @@ function vShop(shop,manual){
   if(!svcs.length) return shopHead(shop,back)+'<p class="empty">Esta barbearia ainda não cadastrou serviços.</p>';
   if(!svcs.some(function(s){return s.id===ui.svc})) ui.svc=svcs[0].id;
   var svc=svcs.filter(function(s){return s.id===ui.svc})[0];
+  loadBusy(shop);
+  var waitCal=!!(apiOf(shop)&&REMOTE[shop.slug]&&REMOTE[shop.slug].state==='loading'&&REMOTE[shop.slug].first);
   var ex=pickedExtras(shop), exP=sumOf(ex,'price');
   var pl=placeOf(shop), home=pl==='home', dur=Number(svc.min)+sumOf(ex,'min')+(home?shop.homeMin:0), fee=home?shop.homeFee:0;
   var lead=manual?0:shop.leadDays, days=nextDays(14+lead).slice(lead);
@@ -544,7 +577,7 @@ function vShop(shop,manual){
       return '<button class="day" data-act="pick-day" data-d="'+d+'" aria-pressed="'+(d===ui.date)+'"'+(open?'':' disabled title="Fechado"')+' aria-label="'+esc(fmtDate(d))+(open?'':' (fechado)')+'"><span class="wd">'+WD[dt.getDay()]+'</span><span class="dn">'+dt.getDate()+'</span><span class="mo">'+MO[dt.getMonth()]+'</span></button>'}).join('')+'</div>'+(lead>0?'<p class="small muted">Agendamento com no mínimo '+lead+(lead===1?' dia':' dias')+' de antecedência.</p>':''));
   h+=sec('st-slot',manual?'Horário':'Escolha o horário',
     '<p class="small muted">'+esc(fmtDate(ui.date))+'</p>'+
-    (slots.length?'<div class="slots">'+slots.map(function(t){return '<button class="slot" data-act="pick-slot" data-t="'+t+'" aria-pressed="'+(t===ui.slot)+'">'+fromMin(t)+'</button>'}).join('')+'</div>'
+    (waitCal?'<p class="empty">Consultando a agenda…</p>':slots.length?'<div class="slots">'+slots.map(function(t){return '<button class="slot" data-act="pick-slot" data-t="'+t+'" aria-pressed="'+(t===ui.slot)+'">'+fromMin(t)+'</button>'}).join('')+'</div>'
                  :'<p class="empty">Sem horários livres neste dia. Escolha outro dia.</p>'));
   var me=manual?null:loadMe();
   h+=sec('st-data',manual?'Dados do cliente':'Seus dados',
@@ -563,18 +596,18 @@ function vShop(shop,manual){
   var total=priceTxt(Number(svc.price)+exP+fee);
   h+='<div class="savebar"><div class="savebar-in"><span class="grow">'+esc(svc.name)+(ex.length?' + '+ex.length+(ex.length===1?' adicional':' adicionais'):'')+' · '+total+'<br><span class="small muted">'+
     (ui.slot!=null?esc(shortDate(ui.date))+' às '+fromMin(ui.slot)+(home?' · a domicílio':'')+(fee>0?' · inclui '+brl(fee)+' de deslocamento':''):'Escolha um horário para continuar')+'</span></span>'+
-    '<button class="btn primary" data-act="confirm"'+(manual?' data-manual="1"':'')+'>Confirmar</button></div></div>';
+    '<button class="btn primary" data-act="confirm"'+(manual?' data-manual="1"':'')+(ui.sending?' disabled':'')+'>'+(ui.sending?'Reservando…':'Confirmar')+'</button></div></div>';
   return h;
 }
 function vDone(shop,b,manual){
-  var msg,waLabel,waTo,calTitle,calDetails,home=b.place==='home',pending=!manual&&S.mode==='local';
+  var msg,waLabel,waTo,calTitle,calDetails,home=b.place==='home',pending=!manual&&S.mode==='local'&&!b.synced;
   if(manual){
     msg=shop.confirmMsg?fill(shop.confirmMsg,b,shop):'Olá, '+b.client+'! Seu horário com a '+shop.name+' está confirmado: '+b.serviceName+', '+fmtDate(b.date)+' às '+fromMin(b.start)+'.'+(home?' Atendimento a domicílio: '+b.address+'.':'');
     waLabel='Enviar confirmação ao cliente no WhatsApp'; waTo=b.phone;
     calTitle=b.serviceName+' · '+b.client; calDetails='Cliente: '+b.client+(b.phone?' · '+fmtPhone(b.phone):'')+' · '+brl(b.price);
   } else {
     msg=(pending?'Olá! Gostaria de agendar: ':'Olá! Agendei pelo app: ')+b.serviceName+', '+fmtDate(b.date)+' às '+fromMin(b.start)+'. Meu nome é '+b.client+'.'+(home?' Atendimento a domicílio: '+b.address+'.':'');
-    waLabel=pending?'Enviar pedido pelo WhatsApp':'Avisar a barbearia no WhatsApp'; waTo=shop.whats;
+    waLabel=pending?'Enviar pedido pelo WhatsApp':(b.synced?'Falar com a barbearia no WhatsApp':'Avisar a barbearia no WhatsApp'); waTo=shop.whats;
     calTitle=b.serviceName+(home?' com a ':' na ')+shop.name; calDetails=b.serviceName+' · '+priceTxt(b.price);
   }
   var c=S.clients[b.clientId], prof='';
@@ -589,6 +622,7 @@ function vDone(shop,b,manual){
   }
   return '<section class="stack"><h1>'+(pending?'Falta só enviar o pedido':'Horário reservado')+'</h1>'+
     (pending?'<p class="muted">Seu pedido só chega à barbearia quando você envia a mensagem pelo WhatsApp. O horário fica garantido depois da confirmação.</p>':'')+
+    (b.synced&&!manual?'<p class="muted">Seu horário já está na agenda da barbearia. Para cancelar ou remarcar, fale pelo WhatsApp.</p>':'')+
     '<div class="receipt"><div class="head">'+esc(fmtDate(b.date))+' · '+fromMin(b.start)+' às '+fromMin(b.start+b.dur)+'</div><dl>'+
       '<dt>Serviço</dt><dd>'+esc(b.serviceName)+' · '+priceTxt(b.price)+(b.fee>0?' <span class="small muted">(inclui '+brl(b.fee)+' de deslocamento)</span>':'')+'</dd>'+
       '<dt>Barbearia</dt><dd>'+esc(shop.name)+'</dd>'+
@@ -598,7 +632,7 @@ function vDone(shop,b,manual){
     '<a class="btn block" target="_blank" rel="noopener" href="'+esc(gcalLink(calTitle,b,calDetails,home?b.address:shop.address))+'">Adicionar ao Google Agenda</a>'+
     '<div class="stack-s"><p class="small muted">Mensagem que será enviada:</p><p class="msg" id="done-msg">'+esc(msg)+'</p>'+
       '<div class="row"><button class="btn sm" data-act="copy" data-from="done-msg">Copiar mensagem</button></div></div>'+prof+
-    (pending?'':'<p class="note">Neste protótipo o WhatsApp abre com a mensagem pronta e você toca em enviar. No app publicado, a confirmação e o lembrete saem sozinhos, e o evento entra direto no Google Agenda do barbeiro.</p>')+
+    (pending||b.synced?'':'<p class="note">Neste protótipo o WhatsApp abre com a mensagem pronta e você toca em enviar. No app publicado, a confirmação e o lembrete saem sozinhos, e o evento entra direto no Google Agenda do barbeiro.</p>')+
     (manual?'<button class="btn block" data-act="open-panel" data-slug="'+esc(shop.slug)+'">Voltar ao painel</button>'
            :'<button class="btn block" data-act="again">Fazer outro agendamento</button>')+'</section>';
 }
@@ -839,7 +873,7 @@ function render(){
   syncSaveBar();
 }
 var toastT=null;
-function toast(m){$toast.textContent=m;$toast.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){$toast.hidden=true},3200)}
+function toast(m,ms){$toast.textContent=m;$toast.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){$toast.hidden=true},ms||3200)}
 
 /* ---------- ações ---------- */
 function validate(d){
@@ -874,17 +908,36 @@ function confirmBooking(shop,manual){
   else if(home&&addr.length<8) ui.err='Informe o endereço completo do atendimento.';
   else if(slotsFor(shop,ui.date,dur).indexOf(ui.slot)<0){ui.err='Esse horário acabou de ser ocupado. Escolha outro.';ui.slot=null}
   else{
-    var cid=(ui.route.clientId&&S.clients[ui.route.clientId])?ui.route.clientId:upsertClient(shop,name,ph,home?addr:'');
-    var b={id:rid('b'),shop:shop.slug,date:ui.date,start:ui.slot,dur:dur,serviceId:svc.id,serviceName:[svc.name].concat(ex.map(function(e){return e.name})).join(' + '),extras:ex.map(function(e){return {id:e.id,name:e.name,price:Number(e.price)||0}}),price:Number(svc.price)+sumOf(ex,'price')+fee,fee:fee,place:home?'home':'shop',address:home?addr:'',client:name,clientId:cid,phone:ph,status:'agendado',createdAt:new Date().toISOString()};
-    if(manual){ui.cname='';ui.cphone='';ui.caddr=''}
-    else saveMe({name:name,phone:ph,addr:home?addr:((loadMe()||{}).addr||'')});
-    ui.err=''; ui.done=b.id; ui.slot=null; ui.extras={}; ui.pbirth=''; ui.pcpf=''; ui.paddr=home?addr:''; ui.pfSaved=false; ui.pfErr='';
-    putBooking(b); try{window.scrollTo(0,0)}catch(e){}
+    var date=ui.date, slot=ui.slot, route=ui.route;
+    var finish=function(synced){
+      var cid=(route.clientId&&S.clients[route.clientId])?route.clientId:upsertClient(shop,name,ph,home?addr:'');
+      var b={id:rid('b'),shop:shop.slug,date:date,start:slot,dur:dur,serviceId:svc.id,serviceName:[svc.name].concat(ex.map(function(e){return e.name})).join(' + '),extras:ex.map(function(e){return {id:e.id,name:e.name,price:Number(e.price)||0}}),price:Number(svc.price)+sumOf(ex,'price')+fee,fee:fee,place:home?'home':'shop',address:home?addr:'',client:name,clientId:cid,phone:ph,status:'agendado',synced:!!synced,createdAt:new Date().toISOString()};
+      if(manual){ui.cname='';ui.cphone='';ui.caddr=''}
+      else saveMe({name:name,phone:ph,addr:home?addr:((loadMe()||{}).addr||'')});
+      ui.err=''; ui.done=b.id; ui.slot=null; ui.extras={}; ui.pbirth=''; ui.pcpf=''; ui.paddr=home?addr:''; ui.pfSaved=false; ui.pfErr='';
+      putBooking(b); try{window.scrollTo(0,0)}catch(e){}
+    };
+    if(manual||!remoteOk(shop)){finish(false);return}
+    if(ui.sending) return;
+    ui.sending=true; ui.err=''; render();
+    var payload={action:'book',shop:shop.slug,date:date,start:slot,dur:dur,service:[svc.name].concat(ex.map(function(e){return e.name})).join(' + '),price:Number(svc.price)+sumOf(ex,'price')+fee,name:name,phone:ph,address:home?addr:''};
+    fetch(apiOf(shop),{method:'POST',body:JSON.stringify(payload)}).then(function(x){return x.json()}).then(function(j){
+      ui.sending=false;
+      if(ui.route!==route){render();return}
+      if(j&&j.ok){finish(true);loadBusy(shop,true);return}
+      if(j&&j.error==='busy'){ui.err='Esse horário acabou de ser ocupado. Escolha outro.';ui.slot=null;loadBusy(shop,true);toStep(['st-slot']);return}
+      if(j&&j.error){ui.err=j.message||'Não foi possível reservar esse horário. Escolha outro ou fale pelo WhatsApp.';toStep(['st-data']);return}
+      finish(false);
+    }).catch(function(e){console.error(e);ui.sending=false; if(ui.route===route) finish(false); else render()});
     return;
   }
   toStep([ui.slot==null?'st-slot':'st-data']);
 }
 var ACT={
+  install:function(){
+    if(deferredInstall){var d=deferredInstall; deferredInstall=null; $install.hidden=true; try{d.prompt()}catch(e){} return}
+    toast('No iPhone: toque em Compartilhar e depois em "Adicionar à Tela de Início".',9000);
+  },
   home:function(){go({name:'home'})},
   seed:function(){seedExample();render()},
   'open-shop':function(t){go({name:'shop',slug:t.dataset.slug})},
@@ -1023,6 +1076,15 @@ document.addEventListener('input',function(e){
   else if(ds.pause){ if(t.type==='checkbox'){ui.draft.pause.on=t.checked;render();return} ui.draft.pause[ds.pause]=t.value }
   syncSaveBar();
 });
+/* ---------- instalar como app ---------- */
+var $install=document.getElementById('install-btn'), deferredInstall=null;
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredInstall=e;$install.hidden=false});
+window.addEventListener('appinstalled',function(){deferredInstall=null;$install.hidden=true});
+try{
+  var web=(location.protocol==='https:'||location.hostname==='localhost')&&!(window.claude&&window.claude.use);
+  if(web&&/iphone|ipad|ipod/i.test(navigator.userAgent)&&!isStandalone()) $install.hidden=false;
+  if(web&&'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(e){console.error(e)});
+}catch(e){}
 window.addEventListener('hashchange',function(){var r=routeOf(location.hash); if(r&&S.shops[r.slug]) go(r)});
 init();
 })();
