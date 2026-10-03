@@ -182,6 +182,12 @@ var $app=document.getElementById('app'), $toast=document.getElementById('toast')
 var LS='cadeira-livre.v1', ME='encaixe.me';
 var PLAN=25;
 var REMINDER='Olá, {cliente}! Lembrete do seu horário na {barbearia}: {servico}, {data} às {hora}. Posso confirmar?';
+/* Barbearias fixas: aparecem para todo mundo que abre o link, mesmo sem banco de dados.
+   Ao mudar algum dado daqui, aumente o "rev" para os navegadores que já abriram o app receberem a versão nova. */
+var BUILTIN=[{rev:1,slug:'barba-na-porta',name:'Barba na Porta',whats:'',address:'',
+  bio:'A experiência da barbearia na sua casa. Barbeiro a domicílio no Recreio e na Barra da Tijuca, no Rio de Janeiro.',
+  step:30,places:{shop:false,home:true},homeFee:0,homeMin:0,
+  services:[{id:'corte',name:'Corte',price:0,min:30},{id:'barba',name:'Barba',price:0,min:20},{id:'corte-barba',name:'Corte + barba',price:0,min:50}]}];
 var WD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 var WDL=['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
 var MO=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -287,6 +293,24 @@ function newShop(name,whats,slug){
     services:[{id:rid('s'),name:'Corte',price:40,min:30},{id:rid('s'),name:'Barba',price:30,min:20},{id:rid('s'),name:'Corte + barba',price:60,min:50}],
     hours:defaultHours(),pause:{on:true,start:'12:00',end:'13:00'},reminder:REMINDER,createdAt:new Date().toISOString()});
 }
+function builtinShops(){
+  return BUILTIN.map(function(d){
+    var s=clone(d); s.builtin=d.rev; delete s.rev;
+    s.hours=s.hours||defaultHours(); s.pause=s.pause||{on:true,start:'12:00',end:'13:00'}; s.reminder=s.reminder||REMINDER;
+    return norm(s);
+  });
+}
+function priceTxt(v){return Number(v)>0?brl(v):'valor a confirmar'}
+function routeOf(h){
+  try{h=decodeURIComponent(String(h||'').replace(/^#/,''))}catch(e){return null}
+  if(!h) return null;
+  var p=h.split('/'); return {name:p[1]==='painel'?'panel':'shop',slug:p[0]};
+}
+function syncHash(r){
+  if(r.manual||r.name==='rate') return;
+  var h=r.name==='home'?'':'#'+r.slug+(r.name==='panel'?'/painel':'');
+  try{ if((location.hash||'')!==h) history.replaceState(null,'',h||location.pathname+location.search) }catch(e){}
+}
 function exampleData(){
   var shop=newShop('Barbearia Exemplo','','barbearia-exemplo');
   shop.example=true; shop.address='Rua Exemplo, 123 — Centro';
@@ -381,13 +405,18 @@ function startLocal(){
   if(raw&&raw.shops&&Object.keys(raw.shops).length){
     S.shops=raw.shops; S.bookings=raw.bookings||{}; S.clients=raw.clients||{};
     Object.keys(S.shops).forEach(function(k){norm(S.shops[k])});
-  } else if(!Object.keys(S.shops).length){ seedExample(); }
+  }
+  var changed=false;
+  builtinShops().forEach(function(b){
+    var cur=S.shops[b.slug];
+    if(!cur||(cur.builtin&&!cur.localEdit&&cur.builtin!==b.builtin)){S.shops[b.slug]=b;changed=true}
+  });
+  if(!Object.keys(S.shops).length) seedExample(); else if(changed) persistLocal();
   render();
 }
 function init(){
-  var h=(location.hash||'').replace(/^#/,'');
-  if(h) ui.route={name:'shop',slug:h};
-  render();
+  var r0=routeOf(location.hash);
+  if(r0) go(r0); else render();
   var p=null;
   try{ if(window.claude&&typeof window.claude.use==='function') p=window.claude.use('db') }catch(e){}
   if(!p){startLocal();return}
@@ -424,7 +453,7 @@ function go(route){
     if(ui.draftOf!==route.slug){ui.draft=null;ui.tab='agenda';ui.pdate=today();ui.cq=''}
     ui.pmonth=ui.pdate.slice(0,7);
   }
-  render(); try{window.scrollTo(0,0)}catch(e){}
+  syncHash(route); render(); try{window.scrollTo(0,0)}catch(e){}
 }
 function toStep(ids){
   render();
@@ -480,7 +509,7 @@ function vShop(shop,manual){
   var h='', n=0, sec=function(id,title,body){return '<section class="stack" id="'+id+'"><div class="step-h"><span class="n">'+(++n)+'</span><h2>'+title+'</h2></div>'+body+'</section>'};
   h+=shopHead(shop,back);
   h+=sec('st-svc',manual?'Serviço':'Escolha o serviço','<div class="stack-s">'+
-    svcs.map(function(s){return '<button class="svc" data-act="pick-svc" data-id="'+esc(s.id)+'" aria-pressed="'+(s.id===ui.svc)+'"><span class="grow"><strong>'+esc(s.name)+'</strong><br><span class="small muted">'+s.min+' min</span></span><span class="price">'+brl(s.price)+'</span></button>'}).join('')+'</div>');
+    svcs.map(function(s){return '<button class="svc" data-act="pick-svc" data-id="'+esc(s.id)+'" aria-pressed="'+(s.id===ui.svc)+'"><span class="grow"><strong>'+esc(s.name)+'</strong><br><span class="small muted">'+s.min+' min</span></span><span class="price">'+priceTxt(s.price)+'</span></button>'}).join('')+'</div>');
   if(shop.places.shop&&shop.places.home) h+=sec('st-place','Local do atendimento','<div class="stack-s">'+
     '<button class="svc" data-act="pick-place" data-p="shop" aria-pressed="'+!home+'"><span class="grow"><strong>Na barbearia</strong><br><span class="small muted">'+esc(shop.address||'No endereço da barbearia')+'</span></span></button>'+
     '<button class="svc" data-act="pick-place" data-p="home" aria-pressed="'+home+'"><span class="grow"><strong>A domicílio</strong><br><span class="small muted">'+(manual?'No endereço do cliente':'O barbeiro vai até você')+'</span></span><span class="price">'+(shop.homeFee>0?'+ '+brl(shop.homeFee):'sem taxa')+'</span></button></div>');
@@ -504,7 +533,7 @@ function vShop(shop,manual){
     if(rv.length) h+='<section class="stack"><h2>O que os clientes dizem</h2>'+rv.map(function(b){
       return '<div class="card stack-s"><p class="rate">'+stars(b.rating)+'</p><p>'+esc(b.review)+'</p><p class="small muted">'+esc(firstName(b.client))+' · '+esc(b.serviceName)+'</p></div>'}).join('')+'</section>';
   }
-  var total=brl(Number(svc.price)+fee);
+  var total=priceTxt(Number(svc.price)+fee);
   h+='<div class="savebar"><div class="savebar-in"><span class="grow">'+esc(svc.name)+' · '+total+'<br><span class="small muted">'+
     (ui.slot!=null?esc(shortDate(ui.date))+' às '+fromMin(ui.slot)+(home?' · a domicílio':'')+(fee>0?' · inclui '+brl(fee)+' de deslocamento':''):'Escolha um horário para continuar')+'</span></span>'+
     '<button class="btn primary" data-act="confirm"'+(manual?' data-manual="1"':'')+'>Confirmar</button></div></div>';
@@ -519,7 +548,7 @@ function vDone(shop,b,manual){
   } else {
     msg='Olá! Agendei pelo app: '+b.serviceName+', '+fmtDate(b.date)+' às '+fromMin(b.start)+'. Meu nome é '+b.client+'.'+(home?' Atendimento a domicílio: '+b.address+'.':'');
     waLabel='Avisar a barbearia no WhatsApp'; waTo=shop.whats;
-    calTitle=b.serviceName+(home?' com a ':' na ')+shop.name; calDetails=b.serviceName+' · '+brl(b.price);
+    calTitle=b.serviceName+(home?' com a ':' na ')+shop.name; calDetails=b.serviceName+' · '+priceTxt(b.price);
   }
   var c=S.clients[b.clientId], prof='';
   if(!manual&&c&&!(c.birth&&c.cpf&&c.address)){
@@ -533,7 +562,7 @@ function vDone(shop,b,manual){
   }
   return '<section class="stack"><h1>Horário reservado</h1>'+
     '<div class="receipt"><div class="head">'+esc(fmtDate(b.date))+' · '+fromMin(b.start)+' às '+fromMin(b.start+b.dur)+'</div><dl>'+
-      '<dt>Serviço</dt><dd>'+esc(b.serviceName)+' · '+brl(b.price)+(b.fee>0?' <span class="small muted">(inclui '+brl(b.fee)+' de deslocamento)</span>':'')+'</dd>'+
+      '<dt>Serviço</dt><dd>'+esc(b.serviceName)+' · '+priceTxt(b.price)+(b.fee>0?' <span class="small muted">(inclui '+brl(b.fee)+' de deslocamento)</span>':'')+'</dd>'+
       '<dt>Barbearia</dt><dd>'+esc(shop.name)+'</dd>'+
       '<dt>Local</dt><dd>'+(home?'A domicílio · '+esc(b.address):'Na barbearia'+(shop.address?' · '+esc(shop.address):''))+'</dd>'+
       '<dt>Cliente</dt><dd>'+esc(b.client)+(b.phone?' · '+esc(fmtPhone(b.phone)):'')+'</dd></dl></div>'+
@@ -727,10 +756,19 @@ function tPerfil(shop){
         :'<p>Plano mensal · <strong>'+brl(PLAN)+'</strong></p><p class="small muted">Cobrança simulada. No app publicado, o pagamento por Pix ou cartão libera o acesso ao painel.</p>')+
       '<div><button class="btn sm" data-act="plan">'+(d.plan==='livre'?'Voltar para o plano mensal':'Liberar acesso sem cobrança')+'</button></div>'+
       '<p class="small muted">No app publicado, só o dono do app consegue liberar ou tirar o acesso livre.</p></div>'+
-    '<div class="card stack-s"><h3>Link da barbearia</h3><p class="small muted">No app publicado, seus clientes agendam por um link próprio, no formato seuapp.com.br/'+esc(shop.slug)+'.</p></div>'+
+    '<div class="card stack-s"><h3>Link da barbearia</h3>'+linkCard(shop)+'</div>'+
     (ui.confirmDel?'<div class="card stack"><p><strong>Excluir '+esc(shop.name)+' e todos os agendamentos?</strong> Não dá para desfazer.</p><div class="row"><button class="btn grow" data-act="del-no">Manter</button><button class="btn danger grow" data-act="del-yes">Excluir barbearia</button></div></div>'
                   :'<div><button class="linkbtn small" data-act="del-ask">Excluir esta barbearia</button></div>')+
     '</section>';
+}
+function linkCard(shop){
+  var web=/^https?:$/.test(location.protocol)&&!(window.claude&&window.claude.use);
+  if(!web) return '<p class="small muted">No app publicado, seus clientes agendam por um link próprio, no formato seuapp.com.br/'+esc(shop.slug)+'.</p>';
+  var u=location.origin+location.pathname+'#'+shop.slug;
+  return '<p class="small muted">Envie este link para os clientes agendarem:</p><p class="msg" id="shop-link">'+esc(u)+'</p>'+
+    '<div class="row"><button class="btn sm" data-act="copy" data-from="shop-link">Copiar link</button></div>'+
+    '<p class="small muted">Link do seu painel:</p><p class="msg">'+esc(u+'/painel')+'</p>'+
+    (shop.builtin?'':'<p class="small muted">Em modo demonstração, este link só abre a barbearia neste aparelho.</p>');
 }
 function perr(){return ui.perr?'<p class="err">'+esc(ui.perr)+'</p>':''}
 
@@ -825,7 +863,7 @@ var ACT={
   copy:function(t){
     var el=document.getElementById(t.dataset.from), txt=el?el.textContent:'';
     var sel=function(){try{var r=document.createRange();r.selectNodeContents(el);var s=getSelection();s.removeAllRanges();s.addRange(r)}catch(e){} toast('Texto selecionado. Copie com o teclado ou o menu.')};
-    try{navigator.clipboard.writeText(txt).then(function(){toast('Mensagem copiada.')},sel)}catch(e){sel()}
+    try{navigator.clipboard.writeText(txt).then(function(){toast('Copiado.')},sel)}catch(e){sel()}
   },
   tab:function(t){ui.tab=t.dataset.tab;ui.perr='';ui.confirmDel=false;render()},
   pmonth:function(t){var ym=ui.pmonth||today().slice(0,7), d=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+(+t.dataset.n),1); ui.pmonth=d.getFullYear()+'-'+pad(d.getMonth()+1); render()},
@@ -894,6 +932,7 @@ var ACT={
     d.services.forEach(function(s){s.price=Number(s.price);s.min=Number(s.min);s.name=String(s.name).trim()});
     d.homeFee=Number(d.homeFee)||0; d.homeMin=Number(d.homeMin)||0;
     var e=validate(d); if(e){ui.perr=e;render();toast(e);return}
+    if(d.builtin) d.localEdit=true;
     ui.perr=''; ui.draft=null; putShop(d); toast('Alterações salvas.');
   },
   'del-ask':function(){ui.confirmDel=true;render()},
@@ -930,7 +969,7 @@ document.addEventListener('input',function(e){
   else if(ds.pause){ if(t.type==='checkbox'){ui.draft.pause.on=t.checked;render();return} ui.draft.pause[ds.pause]=t.value }
   syncSaveBar();
 });
-window.addEventListener('hashchange',function(){var h=(location.hash||'').replace(/^#/,''); if(h&&S.shops[h]) go({name:'shop',slug:h})});
+window.addEventListener('hashchange',function(){var r=routeOf(location.hash); if(r&&S.shops[r.slug]) go(r)});
 init();
 })();
 </script>

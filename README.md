@@ -2,6 +2,12 @@
 
 Agenda online para barbearias. Cada barbearia tem seu perfil, seus serviços e uma página para o cliente marcar horário sozinho, com aviso pelo WhatsApp e evento no Google Agenda.
 
+## Links
+
+- App: https://tracosolto.github.io/agenday/
+- Barba na Porta (cliente): https://tracosolto.github.io/agenday/#barba-na-porta
+- Barba na Porta (painel): https://tracosolto.github.io/agenday/#barba-na-porta/painel
+
 ## Situação atual
 
 Protótipo em modo demonstração: o app inteiro está em `index.html` e os dados ficam salvos apenas no navegador de quem usa. Um agendamento feito em um aparelho ainda não aparece em outro.
