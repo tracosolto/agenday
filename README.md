@@ -1,4 +1,4 @@
-# Encaixe
+# Agenday
 
 Agenda online para barbearias. Cada barbearia tem seu perfil, seus serviços e uma página para o cliente marcar horário sozinho, com aviso pelo WhatsApp e evento no Google Agenda.
 

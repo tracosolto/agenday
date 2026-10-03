@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Encaixe · agenda online para barbearias</title>
-<meta name="description" content="Agenda online para barbearias: o cliente marca o horário sozinho, com aviso pelo WhatsApp e evento no Google Agenda.">
+<title>Agenday · agendamentos de serviços</title>
+<meta name="description" content="Agenday: o cliente marca o horário sozinho, com aviso pelo WhatsApp.">
 <meta name="theme-color" content="#0a0a0a">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -28,9 +28,9 @@ img{max-width:100%}
 :root{
   color-scheme:dark;
   --bg:#0a0a0a; --surface:#141413; --sunken:#1d1d1b;
-  --ink:#fbfaf7; --muted:#a5a199; --line:#2b2924;
-  --brand:#d4af37; --on-brand:#0a0a0a; --brand-soft:#2b2412;
-  --accent:#d4af37;
+  --ink:#f6f1e8; --muted:#a5a199; --line:#2b2924;
+  --brand:#d6ab5c; --on-brand:#0a0a0a; --brand-soft:#2b2412;
+  --accent:#d6ab5c;
   --go:#6fd3a0; --on-go:#06231a; --go-soft:#15301f;
   --warn:#e9c46a; --warn-soft:#33290f;
   --bad:#f08a80; --bad-soft:#3d1c19;
@@ -56,7 +56,7 @@ h3{font-size:1rem;font-weight:600}
 .brandname{font-family:var(--font-display);font-weight:700;font-size:1.3rem;letter-spacing:-.04em;color:var(--ink);text-transform:lowercase;background:none;border:0;padding:0;cursor:pointer}
 .tag{font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:2px 8px}
 .top .spacer{flex:1}
-.brandname::after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--brand);margin-left:3px}
+.brandname img{display:block;height:26px;width:auto}
 .pole{height:1px;background:var(--line)}
 
 .wrap{max-width:640px;margin-inline:auto;padding-inline:16px;padding-block:22px 110px;display:flex;flex-direction:column;gap:26px}
@@ -174,8 +174,7 @@ section[id^="st-"]{scroll-margin-top:76px}
 <body>
 <header class="top">
   <div class="top-in">
-    <button class="brandname" data-act="home" id="brand-home">Encaixe</button>
-    <span class="tag">protótipo</span>
+    <button class="brandname" data-act="home" id="brand-home" aria-label="Agenday, página inicial"><img src="logo.png" alt="Agenday" width="113" height="26"></button>
     <span class="spacer"></span>
     <button class="btn sm" id="install-btn" data-act="install" hidden>Instalar app</button>
   </div>
