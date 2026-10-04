@@ -367,6 +367,27 @@ begin
 end;
 $$;
 
+-- Passa um negócio para outra conta já aprovada (por exemplo, do administrador para o profissional).
+create or replace function public.admin_transfer_shop(p_slug text, p_user uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Acesso restrito ao administrador.' using errcode = '42501';
+  end if;
+  if not exists (select 1 from profiles where id = p_user and status = 'approved') then
+    raise exception 'A conta de destino precisa estar aprovada.';
+  end if;
+  update shops set owner = p_user where slug = p_slug;
+  if not found then
+    raise exception 'Negócio não encontrado.';
+  end if;
+  return jsonb_build_object('ok', true);
+end;
+$$;
+
+revoke all on function public.admin_transfer_shop(text, uuid) from public, anon;
+grant execute on function public.admin_transfer_shop(text, uuid) to authenticated;
+
 revoke all on function public.admin_set_status(uuid, text) from public, anon;
 grant execute on function public.admin_set_status(uuid, text) to authenticated;
 grant execute on function public.public_busy(text, text, text), public.public_reviews(text),

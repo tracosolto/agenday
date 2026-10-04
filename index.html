@@ -288,7 +288,7 @@ var db=null;
 var ui={route:{name:'home'},sending:false,extras:{},svc:null,date:null,slot:null,place:null,cname:'',cphone:'',caddr:'',err:'',done:null,
         tab:'agenda',pdate:null,draft:null,draftOf:null,base:'',perr:'',confirmDel:false,
         newName:'',newWhats:'',newErr:'',pmonth:null,cq:'',cid:null,cdraft:null,cerr:'',cdel:false,
-        rstar:0,rtext:'',pbirth:'',pcpf:'',paddr:'',pfSaved:false,pfErr:'',aEmail:'',aPass:'',aName:''};
+        rstar:0,rtext:'',pbirth:'',pcpf:'',paddr:'',pfSaved:false,pfErr:'',aEmail:'',aPass:'',aName:'',ownSel:{}};
 
 /* ---------- utilidades ---------- */
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -1227,7 +1227,19 @@ function shopCard(s,mine){
   return '<article class="card shop"><div class="stack-s"><h3>'+esc(s.name)+(s.plan==='livre'?' <span class="badge free">sem cobrança</span>':'')+'</h3>'+
     '<p class="meta">'+n+(n===1?' serviço':' serviços')+(s.places.home?' · atende a domicílio':'')+(mine?'':' · '+esc(ownerLabel(A.own[s.slug])))+'</p></div>'+
     '<div class="row"><button class="btn primary grow" data-act="open-panel" data-slug="'+esc(s.slug)+'">Abrir painel</button>'+
-    '<button class="btn grow" data-act="open-shop" data-slug="'+esc(s.slug)+'">Página do cliente</button></div></article>';
+    '<button class="btn grow" data-act="open-shop" data-slug="'+esc(s.slug)+'">Página do cliente</button></div>'+(isAdmin()?shopAdmin(s):'')+'</article>';
+}
+/* Só o administrador vê: quem é o responsável pelo negócio e se ele paga mensalidade. */
+function shopAdmin(s){
+  var acc=(A.accounts||[]).filter(function(a){return a.status==='approved'}), cur=A.own[s.slug], sel=ui.ownSel[s.slug]||cur;
+  var free=s.plan==='livre';
+  return '<div class="stack-s" style="border-top:1px solid var(--line);padding-top:10px">'+
+    '<p class="small muted">'+(free?'Sem cobrança: este negócio usa o app de graça.':'Plano mensal de '+brl(PLAN)+' (a cobrança ainda não está ativa).')+'</p>'+
+    '<div><button class="btn sm" data-act="plan-toggle" data-slug="'+esc(s.slug)+'">'+(free?'Voltar para o plano mensal':'Liberar sem cobrança')+'</button></div>'+
+    (acc.length>1?'<div class="row" style="align-items:flex-end"><label class="field grow" for="own-'+esc(s.slug)+'">Conta responsável<select id="own-'+esc(s.slug)+'" data-ownsel="'+esc(s.slug)+'">'+
+      acc.map(function(a){return '<option value="'+esc(a.id)+'"'+(a.id===sel?' selected':'')+'>'+esc((a.name||'Sem nome')+' · '+a.email)+'</option>'}).join('')+'</select></label>'+
+      '<button class="btn sm" data-act="transfer" data-slug="'+esc(s.slug)+'"'+(sel===cur?' disabled':'')+'>Transferir</button></div>'
+      :'<p class="small muted">Para passar este negócio a outra pessoa, ela precisa criar a conta e ser aprovada em "Contas".</p>')+'</div>';
 }
 function ownerLabel(id){
   var a=(A.accounts||[]).filter(function(x){return x.id===id})[0];
@@ -1514,6 +1526,20 @@ var ACT={
     }).catch(function(e){console.error(e);toast('Não foi possível alterar a conta.');loadAccounts()});
   },
   'rm-logo':function(){ if(!ui.draft) return; ui.draft.logo=''; render()},
+  'plan-toggle':function(t){
+    var sh=S.shops[t.dataset.slug]; if(!sh||!isAdmin()) return;
+    var n=clone(sh); n.plan=sh.plan==='livre'?'mensal':'livre';
+    if(ui.draft&&ui.draftOf===n.slug) ui.draft=null;
+    putShop(n); toast(n.plan==='livre'?'Acesso liberado sem cobrança.':'Negócio de volta ao plano mensal.');
+  },
+  transfer:function(t){
+    var slug=t.dataset.slug, to=ui.ownSel[slug];
+    if(!sb||!isAdmin()||!to||to===A.own[slug]) return;
+    t.disabled=true;
+    sb.rpc('admin_transfer_shop',{p_slug:slug,p_user:to}).then(chk).then(function(){
+      A.own[slug]=to; delete ui.ownSel[slug]; toast('Negócio transferido.'); render();
+    }).catch(function(e){console.error(e);toast('Não foi possível transferir. Confira se a conta está aprovada.',5000);render()});
+  },
   'theme-color':function(t){ if(!ui.draft) return; ui.draft.theme.color=t.dataset.c; render()},
   'theme-mode':function(t){ if(!ui.draft) return; ui.draft.theme.mode=t.dataset.m==='light'?'light':'dark'; render()},
   seed:function(){seedExample();render()},
@@ -1682,6 +1708,7 @@ document.addEventListener('submit',function(e){
 document.addEventListener('input',function(e){
   var t=e.target, ds=t.dataset; if(!ds) return;
   if(ds.mask){var end=true; try{end=t.selectionStart===t.value.length}catch(x){} if(end) t.value=ds.mask==='cpf'?maskCpf(t.value):maskPhone(t.value)}
+  if(ds.ownsel){ui.ownSel[ds.ownsel]=t.value;render();return}
   if(ds.bind){
     ui[ds.bind]=t.value;
     if(ds.bind==='cq') render();
