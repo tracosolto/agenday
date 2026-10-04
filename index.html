@@ -915,6 +915,7 @@ function pubFoot(){
     (uid()?'':'<button class="linkbtn small" data-act="home">Sou profissional: entrar</button>')+'</footer>';
 }
 function vDone(shop,b,manual){
+  if(CLOUD&&b.origin==='cliente'&&!b.synced){b=clone(b);b.synced=true}
   var msg,waLabel,waTo,calTitle,calDetails,home=b.place==='home',pending=!manual&&!b.synced&&(S.mode==='local'||(CLOUD&&!onCloud(shop.slug)));
   if(manual){
     msg=shop.confirmMsg?fill(shop.confirmMsg,b,shop):'Olá, '+b.client+'! Seu horário com a '+shop.name+' está confirmado: '+b.serviceName+', '+fmtDate(b.date)+' às '+fromMin(b.start)+'.'+(home?' Atendimento a domicílio: '+b.address+'.':'');
